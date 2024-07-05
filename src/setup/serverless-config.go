@@ -2,8 +2,6 @@ package setup
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 	"math"
 	"os"
 	"os/exec"
@@ -12,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
 // Serverless describes the serverless.yml contents.
@@ -104,9 +105,9 @@ var nonAlphanumericRegex *regexp.Regexp = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
 var providerFunctionNames map[string]([]string) = make(map[string]([]string))
 
 const (
-	AWS_DEFAULT_REGION         = "us-west-1"
+	AWS_DEFAULT_REGION         = "us-west-1" //TODO change to closest one to berlin
 	AZURE_DEFAULT_REGION       = "West US"
-	GCR_DEFAULT_REGION         = "us-west1"
+	GCR_DEFAULT_REGION         = "us-west1" //TODO change to closest one to berlin
 	ALIBABA_DEFAULT_REGION     = "us-west-1"
 	ALIBABA_DEFAULT_ACCOUNT_ID = "5776795023355240"
 )
@@ -183,7 +184,7 @@ func (s *Serverless) AddFunctionConfigAWS(subex *SubExperiment, index int, rando
 	if s.Functions == nil {
 		s.Functions = make(map[string]*Function)
 	}
-	
+
 	for i := 0; i < subex.Parallelism; i++ {
 		handler := subex.Handler
 		runtime := subex.Runtime
@@ -310,6 +311,10 @@ func RemoveService(config *Configuration, path string) string {
 	case "aliyun":
 		RemoveAlibabaAllServices(path, len(config.SubExperiments))
 		return "All Alibaba Cloud services removed."
+	case "flyio":
+		RemoveFlyioAllApps(config.SubExperiments)
+		return "All Fly.io apps removed."
+
 	default:
 		log.Fatalf(fmt.Sprintf("Failed to remove service for unrecognised provider %s", config.Provider))
 		return ""
@@ -393,6 +398,25 @@ func RemoveGCRSingleService(service string) string {
 	return deleteMessage
 }
 
+// RemoveFlyioAllApps removes all Fly.io apps
+func RemoveFlyioAllApps(subExperiments []SubExperiment) []string {
+	log.Infof("Removing Fly.io apps...")
+	var removeServiceMessages []string
+	for _, functionName := range providerFunctionNames["flyio"] {
+		removeMessage := RemoveFlyioSingleApp(functionName)
+		removeServiceMessages = append(removeServiceMessages, removeMessage)
+	}
+	return removeServiceMessages
+}
+
+// RemoveFlyioSingleApp removes a single Fly.io app
+func RemoveFlyioSingleApp(service string) string {
+	log.Infof("Removing Fly.io app %s...", service)
+	removeAppCommand := exec.Command("fly", "apps", "destroy", "--yes", service)
+	removeMessage := util.RunCommandAndLog(removeAppCommand)
+	return removeMessage
+}
+
 // RemoveCloudflareAllWorkers removes all Cloudflare Workers
 func RemoveCloudflareAllWorkers(subExperiments []SubExperiment) []string {
 	log.Infof("Removing Cloudflare Workers...")
@@ -457,6 +481,34 @@ func (s *Serverless) DeployGCRContainerService(subex *SubExperiment, index int, 
 		subex.Endpoints = append(subex.Endpoints, EndpointInfo{ID: GetGCREndpointID(deployMessage)})
 		subex.AddRoute("")
 	}
+}
+
+// DeployFlyioApp deploys a Fly.io app
+func DeployFlyioApp(subex *SubExperiment, index int, randomTag string, imageLink string) {
+	log.Infof("Deploying Fly.io app...")
+	for i := 0; i < subex.Parallelism; i++ {
+		name := fmt.Sprintf("%s-%s", randomTag, createName(subex, index, i))
+		providerFunctionNames["flyio"] = append(providerFunctionNames["flyio"], name) // Used for function removal
+
+		flyDeployCommand := exec.Command("fly", "launch", "--image", imageLink, "--name", name)
+		deployMessage := util.RunCommandAndLog(flyDeployCommand)
+		subex.Endpoints = append(subex.Endpoints, EndpointInfo{ID: GetFlyioEndpointID(deployMessage)})
+		subex.AddRoute("")
+	}
+}
+
+/*
+Example Fly.io deployment message:
+Created app 'test1-red-dust-6855' in organization 'personal'N) N
+Admin URL: https://fly.io/apps/test1-red-dust-6855
+Hostname: test1-red-dust-6855.fly.dev
+
+*/
+// GetFlyioEndpointID returns the Fly.io endpoint ID
+func GetFlyioEndpointID(message string) string {
+	regex := regexp.MustCompile(`Hostname: (.*)`)
+	endpointID := regex.FindStringSubmatch(message)[1]
+	return endpointID
 }
 
 func DeployCloudflareWorkers(subex *SubExperiment, index int, randomTag string, path string) {

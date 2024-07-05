@@ -24,12 +24,13 @@ package benchhttp
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"stellar/setup"
 	"stellar/setup/deployment/connection/amazon"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // CreateRequest will generate an HTTP request according to the provider passed in the sub-experiment
@@ -58,6 +59,12 @@ func CreateRequest(provider string, payloadLengthBytes int, gatewayEndpoint setu
 			http.MethodGet,
 			fmt.Sprintf("%s.azurewebsites.net", gatewayEndpoint.ID),
 		)
+
+		appendProducerConsumerParameters(provider, request, payloadLengthBytes, assignedFunctionIncrementLimit, gatewayEndpoint, storageTransfer, route)
+	case "fly.io":
+		// Example Fly.io URL:
+		// https://ldb-nodejs.fly.dev
+		request = createGeneralHttpsRequest(http.MethodGet, fmt.Sprintf("%s.fly.dev", gatewayEndpoint.ID))
 
 		appendProducerConsumerParameters(provider, request, payloadLengthBytes, assignedFunctionIncrementLimit, gatewayEndpoint, storageTransfer, route)
 	case "google":

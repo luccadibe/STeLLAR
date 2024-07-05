@@ -24,12 +24,13 @@ package benchhttp
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"stellar/setup"
 	"stellar/setup/deployment/connection"
 	"stellar/setup/deployment/connection/amazon"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const randomGatewayID = "uicnaywo3rb3nsci"
@@ -60,6 +61,25 @@ func TestCreateExternalRequest(t *testing.T) {
 
 	require.Equal(t, "www.google.com", req.Host)
 	require.Equal(t, "www.google.com", req.URL.Host)
+	require.Equal(t, http.MethodGet, req.Method)
+	require.Equal(t, "https", req.URL.Scheme)
+}
+
+func TestCreateFlyioRequest(t *testing.T) {
+	randomPayloadLength := 7
+	randomEndpoint := setup.EndpointInfo{
+		ID:                   randomGatewayID,
+		DataTransferChainIDs: []string{},
+	}
+
+	connection.Initialize("fly.io", "", "../../../setup/deployment/raw-code/functions/producer-consumer/api-template.json")
+
+	randomAssignedIncrement := int64(1482911482)
+	req := CreateRequest("fly.io", randomPayloadLength, randomEndpoint, randomAssignedIncrement, false, "route1")
+
+	expectedHostname := fmt.Sprintf("%s.fly.dev", randomEndpoint.ID)
+	require.Equal(t, expectedHostname, req.Host)
+	require.Equal(t, expectedHostname, req.URL.Host)
 	require.Equal(t, http.MethodGet, req.Method)
 	require.Equal(t, "https", req.URL.Scheme)
 }

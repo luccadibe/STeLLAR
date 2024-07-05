@@ -24,11 +24,12 @@ package packaging
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"stellar/setup/deployment/connection/amazon"
 	"stellar/util"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var builtImages = make(map[string]bool)

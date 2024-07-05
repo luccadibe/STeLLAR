@@ -26,13 +26,14 @@ package connection
 
 import (
 	"encoding/json"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"path"
 	"stellar/setup/deployment/connection/amazon"
 	"stellar/util"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Endpoint is the schema for the configuration of provider endpoints.
@@ -74,6 +75,8 @@ func Initialize(provider string, endpointsDirectoryPath string, apiTemplatePath 
 		setupFileConnection(path.Join(endpointsDirectoryPath, "azure.json"))
 	case "google":
 		setupFileConnection(path.Join(endpointsDirectoryPath, "google.json"))
+	case "fly.io":
+		setupFileConnection(path.Join(endpointsDirectoryPath, "flyio.json"))
 	default:
 		setupExternalConnection()
 		log.Warnf("Provider %s does not support initialization with the client, setting to external URL.", provider)
